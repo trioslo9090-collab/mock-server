@@ -14,6 +14,8 @@ paths:
             application/json:
               schema:
                 type: array
+                minItems: 2
+                maxItems: 5
                 items:
                   $ref: '#/components/schemas/Pet'
     post:
@@ -72,6 +74,12 @@ components:
             - available
             - pending
             - sold
+        uuid:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
         age:
           type: integer
           minimum: 0
