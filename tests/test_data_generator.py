@@ -379,6 +379,153 @@ class TestDataGeneratorReferences:
         assert value["ref"]["ref"]["ref"] is None
 
 
+class TestDataGeneratorFieldNames:
+    """Tests for realistic field name generation"""
+
+    def test_field_name_exact_match_generates_realistic_name(self):
+        """Field 'name' exactly matched generates realistic person name"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Name pattern: First capital letter, letters/spaces/hyphens/apostrophes/dots
+            assert re.match(r"^[A-Z][a-zA-Z\s'\-\.]*$", data["name"]), f"Invalid name: {data['name']}"
+
+    def test_field_name_city_generates_realistic_city(self):
+        """Field 'city' generates realistic city name"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"city": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # City pattern: First capital letter, letters/spaces/hyphens/dots
+            assert re.match(r"^[A-Z][a-zA-Z\s'\-\.]*$", data["city"]), f"Invalid city: {data['city']}"
+
+    def test_field_name_street_must_contain_digit_and_space(self):
+        """Field 'street' generates address with digit and space"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"street": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Street address must have both digit and space
+            assert any(c.isdigit() for c in data["street"]), f"No digit in street: {data['street']}"
+            assert " " in data["street"], f"No space in street: {data['street']}"
+
+    def test_field_name_zipcode_valid_format(self):
+        """Field 'zipcode' generates valid zipcode format"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"zipcode": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Zipcode: 5 digits, optionally +4 more after hyphen
+            assert re.fullmatch(r"\d{5}(-\d{4})?", data["zipcode"]), f"Invalid zipcode: {data['zipcode']}"
+
+    def test_field_name_phone_contains_digits(self):
+        """Field 'phone' generates phone number with digits"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"phone": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Phone must contain digits
+            assert any(c.isdigit() for c in data["phone"]), f"No digits in phone: {data['phone']}"
+
+    def test_field_name_username_not_matched(self):
+        """Field 'username' NOT matched by 'name' rule (exact match only)"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"username": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Username should be random lowercase (fallback), NOT a realistic name
+            assert re.match(r"^[a-z]+$", data["username"]), f"Username should be random letters: {data['username']}"
+
+    def test_format_takes_priority_over_field_name(self):
+        """Format takes priority over field name matching"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"name": {"type": "string", "format": "email"}}}
+
+        data = gen.generate_from_schema(schema, {})
+        # Should be email format, not a person name
+        assert re.match(r"^[^@]+@[^@]+\.[^@]+$", data["name"]), f"Should be email: {data['name']}"
+
+    def test_enum_takes_priority_over_field_name(self):
+        """Enum takes priority over field name matching"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"city": {"enum": ["red", "green", "blue"]}}}
+
+        data = gen.generate_from_schema(schema, {})
+        # Should pick from enum, not generate city
+        assert data["city"] in ["red", "green", "blue"]
+
+    def test_field_name_respects_maxLength_with_rstrip(self):
+        """Field name generation respects maxLength and rstrips trailing spaces"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"name": {"type": "string", "maxLength": 10}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Must be <= maxLength after rstrip
+            assert len(data["name"].rstrip()) <= 10, f"Too long after rstrip: {data['name']} ({len(data['name'])})"
+            # But stored value should be <= maxLength (before rstrip)
+            assert len(data["name"]) <= 10, f"Stored value too long: {data['name']} ({len(data['name'])})"
+
+    def test_field_name_respects_minLength_not_broken_by_rstrip(self):
+        """Field name generation respects minLength even after rstrip"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"name": {"type": "string", "minLength": 8, "maxLength": 15}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Must be >= minLength
+            assert len(data["name"]) >= 8, f"Too short: {data['name']} ({len(data['name'])})"
+            # Must be <= maxLength
+            assert len(data["name"]) <= 15, f"Too long: {data['name']} ({len(data['name'])})"
+
+    def test_multiple_field_names_in_object(self):
+        """Multiple realistic field names in single object"""
+        gen = DataGenerator(seed=42)
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "city": {"type": "string"},
+                "phone": {"type": "string"}
+            }
+        }
+
+        data = gen.generate_from_schema(schema, {})
+        # Each should be realistic for its field
+        assert re.match(r"^[A-Z][a-zA-Z\s'\-\.]*$", data["name"])
+        assert re.match(r"^[A-Z][a-zA-Z\s'\-\.]*$", data["city"])
+        assert any(c.isdigit() for c in data["phone"])
+
+    def test_field_name_seed_reproducibility(self):
+        """Field name generation respects seed"""
+        gen1 = DataGenerator(seed=99)
+        schema1 = {"type": "object", "properties": {"name": {"type": "string"}}}
+        data1 = gen1.generate_from_schema(schema1, {})
+
+        gen2 = DataGenerator(seed=99)
+        schema2 = {"type": "object", "properties": {"name": {"type": "string"}}}
+        data2 = gen2.generate_from_schema(schema2, {})
+
+        assert data1["name"] == data2["name"], "Same seed should produce same name"
+
+    def test_unknown_field_name_falls_back_to_random(self):
+        """Unknown field name falls back to random string"""
+        gen = DataGenerator(seed=42)
+        schema = {"type": "object", "properties": {"xyz_unknown_field": {"type": "string"}}}
+
+        for _ in range(20):
+            data = gen.generate_from_schema(schema, {})
+            # Unknown field → random lowercase letters
+            assert re.match(r"^[a-z]+$", data["xyz_unknown_field"]), f"Should be random: {data['xyz_unknown_field']}"
+
+
 class TestDataGeneratorSeed:
     """Tests for seed-based reproducibility"""
 
