@@ -24,9 +24,9 @@ class DataGenerator:
 
     def generate_from_schema(self, schema, components):
         """Generate data from schema"""
-        return self._generate(schema, components, depth=0)
+        return self._generate(schema, components, depth=0, field_name=None)
 
-    def _generate(self, schema, components, depth=0):
+    def _generate(self, schema, components, depth=0, field_name=None):
         """Internal recursive generator with depth tracking"""
         if not isinstance(schema, dict):
             return None
@@ -47,7 +47,7 @@ class DataGenerator:
         schema_type = schema.get("type")
 
         if schema_type == "string":
-            return self._generate_string(schema)
+            return self._generate_string(schema, field_name=field_name)
         elif schema_type == "integer":
             return self._generate_integer(schema)
         elif schema_type == "number":
@@ -55,13 +55,13 @@ class DataGenerator:
         elif schema_type == "boolean":
             return self.random.choice([True, False])
         elif schema_type == "array":
-            return self._generate_array(schema, components, depth)
+            return self._generate_array(schema, components, depth, field_name=field_name)
         elif schema_type == "object":
-            return self._generate_object(schema, components, depth)
+            return self._generate_object(schema, components, depth, field_name=field_name)
 
         return None
 
-    def _generate_string(self, schema):
+    def _generate_string(self, schema, field_name=None):
         """Generate string with format and length constraints"""
         fmt = schema.get("format")
 
@@ -87,10 +87,12 @@ class DataGenerator:
                 # max not in schema: use default, but respect min
                 max_length = max(20, min_length + 10)
 
-            length = self.random.randint(min_length, max_length)
-            # Generate random string of exact length
-            chars = "abcdefghijklmnopqrstuvwxyz"
-            return "".join(self.random.choice(chars) for _ in range(length))
+            # Try field-name-based generation
+            if field_name:
+                return self._generate_string_by_field_name(field_name, min_length, max_length)
+
+            # Fallback: random string
+            return self._generate_random_string(min_length, max_length)
 
     def _generate_integer(self, schema):
         """Generate integer with min/max constraints"""
@@ -122,7 +124,7 @@ class DataGenerator:
 
         return self.random.uniform(minimum, maximum)
 
-    def _generate_array(self, schema, components, depth):
+    def _generate_array(self, schema, components, depth, field_name=None):
         """Generate array with minItems/maxItems constraints"""
         # Never change schema values, only adapt defaults
         min_items = schema.get("minItems")
@@ -137,14 +139,61 @@ class DataGenerator:
 
         items_schema = schema.get("items", {})
         count = self.random.randint(min_items, max_items)
-        return [self._generate(items_schema, components, depth) for _ in range(count)]
+        return [self._generate(items_schema, components, depth, field_name=None) for _ in range(count)]
 
-    def _generate_object(self, schema, components, depth):
+    def _generate_object(self, schema, components, depth, field_name=None):
         """Generate object from properties"""
         properties = schema.get("properties", {})
         obj = {}
 
         for prop_name, prop_schema in properties.items():
-            obj[prop_name] = self._generate(prop_schema, components, depth)
+            obj[prop_name] = self._generate(prop_schema, components, depth, field_name=prop_name)
 
         return obj
+
+    def _generate_string_by_field_name(self, field_name, min_length, max_length):
+        """Generate realistic string based on field name (exact match, lowercase)"""
+        field_lower = field_name.lower()
+
+        # Exact field name mappings
+        field_map = {
+            "name": lambda: self.faker.name(),
+            "first_name": lambda: self.faker.first_name(),
+            "last_name": lambda: self.faker.last_name(),
+            "city": lambda: self.faker.city(),
+            "street": lambda: self.faker.street_address(),
+            "address_line": lambda: self.faker.street_address(),
+            "zipcode": lambda: self.faker.zipcode(),
+            "postcode": lambda: self.faker.postcode(),
+            "zip": lambda: self.faker.postcode(),
+            "phone": lambda: self.faker.phone_number(),
+            "country": lambda: self.faker.country(),
+            "company": lambda: self.faker.company(),
+            "description": lambda: self.faker.sentence(),
+            "title": lambda: self.faker.sentence(),
+        }
+
+        # Exact match only
+        if field_lower in field_map:
+            value = field_map[field_lower]()
+            # Handle length constraints with rstrip
+            if len(value) > max_length:
+                value = value[:max_length].rstrip()
+                # If rstrip made it too short, regenerate or pad
+                if len(value) < min_length:
+                    value = value[:max_length]  # Keep original truncation
+            elif len(value) < min_length:
+                # Pad with generated content
+                extra = self._generate_random_string(min_length - len(value), min_length - len(value))
+                value = (value + " " + extra)[:max_length]
+
+            return value
+
+        # Unknown field: random
+        return self._generate_random_string(min_length, max_length)
+
+    def _generate_random_string(self, min_length, max_length):
+        """Generate random lowercase string"""
+        length = self.random.randint(min_length, max_length)
+        chars = "abcdefghijklmnopqrstuvwxyz"
+        return "".join(self.random.choice(chars) for _ in range(length))
