@@ -437,6 +437,22 @@ class TestDataGeneratorSeed:
 
         assert value1 == value2
 
+    def test_seed_independent_generators(self):
+        """Two generators with same seed produce same values independently"""
+        schema = {"type": "integer", "minimum": 1, "maximum": 1000}
+
+        gen1 = DataGenerator(seed=42)
+        gen2 = DataGenerator(seed=42)
+
+        # Both generators should produce same sequence independently
+        v1_1 = gen1.generate_from_schema(schema, {})
+        v2_1 = gen2.generate_from_schema(schema, {})
+        assert v1_1 == v2_1, "First values from two generators with same seed should match"
+
+        v1_2 = gen1.generate_from_schema(schema, {})
+        v2_2 = gen2.generate_from_schema(schema, {})
+        assert v1_2 == v2_2, "Second values from two generators with same seed should match"
+
 
 class TestDataGeneratorBugFixes:
     """Regression tests for edge cases and bugs"""

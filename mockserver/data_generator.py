@@ -13,8 +13,10 @@ class DataGenerator:
         self.seed = seed
         self.resolver = SchemaResolver()
 
+        # Use independent random.Random instance instead of global random
+        self.random = random.Random(seed)
+
         if seed is not None:
-            random.seed(seed)
             self.faker = Faker()
             self.faker.seed_instance(seed)
         else:
@@ -39,7 +41,7 @@ class DataGenerator:
 
         # Handle enum: pick random value
         if "enum" in schema:
-            return random.choice(schema["enum"])
+            return self.random.choice(schema["enum"])
 
         # Handle by type
         schema_type = schema.get("type")
@@ -51,7 +53,7 @@ class DataGenerator:
         elif schema_type == "number":
             return self._generate_number(schema)
         elif schema_type == "boolean":
-            return random.choice([True, False])
+            return self.random.choice([True, False])
         elif schema_type == "array":
             return self._generate_array(schema, components, depth)
         elif schema_type == "object":
@@ -85,10 +87,10 @@ class DataGenerator:
                 # max not in schema: use default, but respect min
                 max_length = max(20, min_length + 10)
 
-            length = random.randint(min_length, max_length)
+            length = self.random.randint(min_length, max_length)
             # Generate random string of exact length
             chars = "abcdefghijklmnopqrstuvwxyz"
-            return "".join(random.choice(chars) for _ in range(length))
+            return "".join(self.random.choice(chars) for _ in range(length))
 
     def _generate_integer(self, schema):
         """Generate integer with min/max constraints"""
@@ -103,7 +105,7 @@ class DataGenerator:
             # max not in schema: use default, but respect min
             maximum = max(1000, minimum + 2000)
 
-        return random.randint(minimum, maximum)
+        return self.random.randint(minimum, maximum)
 
     def _generate_number(self, schema):
         """Generate float with min/max constraints"""
@@ -118,7 +120,7 @@ class DataGenerator:
             # max not in schema: use default, but respect min
             maximum = max(1000.0, minimum + 2000.0)
 
-        return random.uniform(minimum, maximum)
+        return self.random.uniform(minimum, maximum)
 
     def _generate_array(self, schema, components, depth):
         """Generate array with minItems/maxItems constraints"""
@@ -134,7 +136,7 @@ class DataGenerator:
             max_items = max(10, min_items + 5)
 
         items_schema = schema.get("items", {})
-        count = random.randint(min_items, max_items)
+        count = self.random.randint(min_items, max_items)
         return [self._generate(items_schema, components, depth) for _ in range(count)]
 
     def _generate_object(self, schema, components, depth):
