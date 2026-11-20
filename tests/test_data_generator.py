@@ -436,3 +436,47 @@ class TestDataGeneratorSeed:
         value2 = gen2.generate_from_schema(schema, {})
 
         assert value1 == value2
+
+
+class TestDataGeneratorBugFixes:
+    """Regression tests for edge cases and bugs"""
+
+    def test_string_minLength_without_maxLength(self):
+        """Regression: minLength without maxLength should not fail"""
+        gen = DataGenerator()
+        schema = {"type": "string", "minLength": 30}
+        value = gen.generate_from_schema(schema, {})
+        assert isinstance(value, str)
+        assert len(value) >= 30
+
+    def test_integer_minimum_without_maximum(self):
+        """Regression: minimum without maximum should not fail"""
+        gen = DataGenerator()
+        schema = {"type": "integer", "minimum": 5000}
+        value = gen.generate_from_schema(schema, {})
+        assert isinstance(value, int)
+        assert value >= 5000
+
+    def test_array_minItems_without_maxItems(self):
+        """Regression: minItems without maxItems should not fail"""
+        gen = DataGenerator()
+        schema = {"type": "array", "minItems": 15, "items": {"type": "string"}}
+        value = gen.generate_from_schema(schema, {})
+        assert isinstance(value, list)
+        assert len(value) >= 15
+
+    def test_integer_maximum_without_minimum(self):
+        """Regression: maximum < default minimum should not fail"""
+        gen = DataGenerator()
+        schema = {"type": "integer", "maximum": -5000}
+        value = gen.generate_from_schema(schema, {})
+        assert isinstance(value, int)
+        assert value <= -5000
+
+    def test_string_maxLength_zero(self):
+        """Regression: maxLength=0 (edge case) should not fail"""
+        gen = DataGenerator()
+        schema = {"type": "string", "maxLength": 0}
+        value = gen.generate_from_schema(schema, {})
+        assert isinstance(value, str)
+        assert len(value) == 0

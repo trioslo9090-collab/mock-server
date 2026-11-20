@@ -74,8 +74,17 @@ class DataGenerator:
             return self.faker.date()
         else:
             # Plain string with length constraints
-            min_length = schema.get("minLength", 1)
-            max_length = schema.get("maxLength", 20)
+            # Never change schema values, only adapt defaults
+            min_length = schema.get("minLength")
+            max_length = schema.get("maxLength")
+
+            if min_length is None:
+                # min not in schema: use default, but respect max if present
+                min_length = 1 if max_length is None else min(1, max_length)
+            if max_length is None:
+                # max not in schema: use default, but respect min
+                max_length = max(20, min_length + 10)
+
             length = random.randint(min_length, max_length)
             # Generate random string of exact length
             chars = "abcdefghijklmnopqrstuvwxyz"
@@ -83,22 +92,48 @@ class DataGenerator:
 
     def _generate_integer(self, schema):
         """Generate integer with min/max constraints"""
-        minimum = schema.get("minimum", -1000)
-        maximum = schema.get("maximum", 1000)
+        # Never change schema values, only adapt defaults
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+
+        if minimum is None:
+            # min not in schema: use default, but respect max if present
+            minimum = -1000 if maximum is None else min(-1000, maximum)
+        if maximum is None:
+            # max not in schema: use default, but respect min
+            maximum = max(1000, minimum + 2000)
+
         return random.randint(minimum, maximum)
 
     def _generate_number(self, schema):
         """Generate float with min/max constraints"""
-        minimum = schema.get("minimum", -1000.0)
-        maximum = schema.get("maximum", 1000.0)
+        # Never change schema values, only adapt defaults
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+
+        if minimum is None:
+            # min not in schema: use default, but respect max if present
+            minimum = -1000.0 if maximum is None else min(-1000.0, maximum)
+        if maximum is None:
+            # max not in schema: use default, but respect min
+            maximum = max(1000.0, minimum + 2000.0)
+
         return random.uniform(minimum, maximum)
 
     def _generate_array(self, schema, components, depth):
         """Generate array with minItems/maxItems constraints"""
-        min_items = schema.get("minItems", 1)
-        max_items = schema.get("maxItems", 10)
-        items_schema = schema.get("items", {})
+        # Never change schema values, only adapt defaults
+        min_items = schema.get("minItems")
+        max_items = schema.get("maxItems")
 
+        if min_items is None:
+            # min not in schema: use default, but respect max if present
+            min_items = 1 if max_items is None else min(1, max_items)
+        if max_items is None:
+            # max not in schema: use default, but respect min
+            max_items = max(10, min_items + 5)
+
+        items_schema = schema.get("items", {})
         count = random.randint(min_items, max_items)
         return [self._generate(items_schema, components, depth) for _ in range(count)]
 
